@@ -51,7 +51,7 @@ function makeWave(length, sampleRate) {
   var waveLength = Math.floor(sampleRate * length)
   var wave = new Array(waveLength).fill(0)
   for (var t = 0; t < wave.length; ++t) {
-    wave[t] += fmTower.oscillate(t)
+    wave[t] += filter.pass(fmTower.oscillate(t))
   }
   return wave
 }
@@ -129,17 +129,20 @@ class StateVariableFilter {
 
   // cutoff の範囲は [0, 1]
   set cutoff(value) {
-    this._cutoff = value
-    this.fc = 2 * Math.sin(Math.PI * this._cutoff / this.sampleRate)
+    value *= 0.5
+    this._cutoff = value * value * value
+    this.fc = 2 * Math.sin(Math.PI * this._cutoff)
+    // this.fc = 2 * Math.sin(Math.PI * this._cutoff / this.sampleRate)
   }
 
+  // 返ってくる q の範囲は [0.5, infinity]
   get q() {
     return 1 / this._q
   }
 
-  // q の範囲は [0.5, infinity]
+  // q の範囲は [0, 1]
   set q(value) {
-    this._q = 1 / value
+    this._q = 2 - value * 2
   }
 
   pass(input) {
@@ -261,6 +264,78 @@ class OperatorControl {
   }
 }
 
+class FilterControls {
+  constructor(parent, audioContext, refreshFunc) {
+    this.refreshFunc = refreshFunc
+    this.passFunc = (filter, value) => value
+    this.MAX_ORDER = 8
+
+    this.div = new Div(parent, "filterControls")
+    this.headingFilterControls = new Heading(this.div.element, 6, "Filter")
+    this.type = new RadioButton(this.div.element, "Type",
+      (value) => this.setPassFunc(value))
+    this.type.add("Bypass")
+    this.type.add("LP")
+    this.type.add("HP")
+    this.type.add("BP")
+    this.type.add("BR")
+    this.order = new NumberInput(this.div.element, "Order",
+      this.MAX_ORDER, 1, this.MAX_ORDER, 1, refreshFunc)
+    this.cutoff = new NumberInput(this.div.element, "Cutoff",
+      0, 0, 1, 0.01, refreshFunc)
+    this.q = new NumberInput(this.div.element, "Q",
+      0, 0, 0.9, 0.01, refreshFunc)
+
+    this.filter = []
+    for (var i = 0; i < this.MAX_ORDER; ++i) {
+      this.filter.push(new StateVariableFilter(audioContext))
+    }
+  }
+
+  setPassFunc(type) {
+    console.log("here", type)
+    switch (type) {
+      case "LP":
+        this.passFunc = (filter, value) => filter.pass(value).lowpass
+        break
+      case "HP":
+        this.passFunc = (filter, value) => filter.pass(value).highpass
+        break
+      case "BP":
+        this.passFunc = (filter, value) => filter.pass(value).bandpass
+        break
+      case "BR":
+        this.passFunc = (filter, value) => filter.pass(value).bandreject
+        break
+      case "Bypass":
+      default:
+        this.passFunc = (filter, value) => value
+        break
+    }
+    this.refreshFunc()
+  }
+
+  refresh() {
+    for (var i = 0; i < this.order.value; ++i) {
+      this.filter[i].cutoff = this.cutoff.value
+      this.filter[i].q = this.q.value
+      this.filter[i].refresh()
+    }
+  }
+
+  random() {
+    this.cutoff.random()
+    this.q.random()
+  }
+
+  pass(value) {
+    for (var i = 0; i < this.order.value; ++i) {
+      value = this.passFunc(this.filter[i], value)
+    }
+    return value
+  }
+}
+
 class FMTower {
   constructor(parent, audioContext, numOperator, refreshFunc) {
     this.audioContext = audioContext
@@ -281,7 +356,9 @@ class FMTower {
   }
 
   set fmIndex(value) {
-    this.operatorControls.forEach(element => element.oscillator.fmIndex = value)
+    for (var i = 0; i < this.operatorControls.length; ++i) {
+      this.operatorControls[i].oscillator.fmIndex = value
+    }
   }
 
   push() {
@@ -296,7 +373,9 @@ class FMTower {
   }
 
   refresh() {
-    this.operatorControls.forEach(element => element.refresh())
+    for (var i = 0; i < this.operatorControls.length; ++i) {
+      this.operatorControls[i].refresh()
+    }
   }
 
   random() {
@@ -324,6 +403,7 @@ function random() {
 function refresh() {
   fmTower.refresh()
   fmTower.fmIndex = inputFMIndex.value
+  filter.refresh()
 
   wave.left = makeWave(fmTower.length, audioContext.sampleRate)
   wave.declick(inputDeclick.value)
@@ -334,7 +414,6 @@ function refresh() {
 var audioContext = new AudioContext()
 
 var quickSave = false
-var filter = new StateVariableFilter(audioContext)
 var wave = new Wave(1)
 
 var divMain = new Div(document.body, "main")
@@ -357,13 +436,7 @@ var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
   quickSave, (checked) => { quickSave = checked })
 
 var fmTower = new FMTower(divMain.element, audioContext, 4, refresh)
-
-var divFilterControls = new Div(divMain.element, "filterControls")
-var headingFilterControls = new Heading(divFilterControls.element, 6, "Filter")
-var inputCutoff = new NumberInput(divFilterControls.element, "Cutoff",
-  0, 0, 1, 0.01, refresh)
-var inputQ = new NumberInput(divFilterControls.element, "Q",
-  0, 0, 0, 0, refresh)
+var filter = new FilterControls(divMain.element, audioContext, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
