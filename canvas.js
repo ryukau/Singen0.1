@@ -211,6 +211,7 @@ class Button {
 class Checkbox {
   constructor(parent, label, checked, onChangeFunc) {
     this.onChangeFunc = onChangeFunc
+    this.value = checked
 
     this.input = document.createElement("input")
     this.input.type = "checkbox"
@@ -228,12 +229,9 @@ class Checkbox {
     return this.label
   }
 
-  get value() {
-    return this.input.checked
-  }
-
   onChange(event) {
-    this.onChangeFunc(event.target.checked)
+    this.value = event.target.checked
+    this.onChangeFunc(this.value)
   }
 }
 

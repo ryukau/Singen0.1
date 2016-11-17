@@ -284,7 +284,7 @@ class FilterControls {
     this.order = new NumberInput(this.div.element, "Order",
       this.MAX_ORDER, 1, this.MAX_ORDER, 1, refreshFunc)
     this.cutoff = new NumberInput(this.div.element, "Cutoff",
-      0, 0, 1, 0.01, refreshFunc)
+      0.5, 0.1, 1, 0.01, refreshFunc)
     this.q = new NumberInput(this.div.element, "Q",
       0, 0, 0.9, 0.01, refreshFunc)
 
@@ -295,7 +295,6 @@ class FilterControls {
   }
 
   setPassFunc(type) {
-    console.log("here", type)
     switch (type) {
       case "LP":
         this.passFunc = (filter, value) => filter.pass(value).lowpass
@@ -398,6 +397,7 @@ class FMTower {
 
 function random() {
   fmTower.random()
+  filter.random()
   refresh()
   play(audioContext, wave)
 }
@@ -408,7 +408,10 @@ function refresh() {
   filter.refresh()
 
   wave.left = makeWave(fmTower.length, audioContext.sampleRate)
-  wave.declick(inputDeclick.value)
+  wave.declick(inputDeclickIn.value, inputDeclickOut.value)
+  if (checkboxNormalize.value) {
+    wave.normalize()
+  }
 
   waveView.set(wave.left)
 }
@@ -447,7 +450,11 @@ var headingMiscControls = new Heading(divMiscControls.element, 6,
 var tenMilliSecond = audioContext.sampleRate / 100
 var inputFMIndex = new NumberInput(divMiscControls.element, "FM Index",
   0.62, 0, 1, 0.01, refresh)
-var inputDeclick = new NumberInput(divMiscControls.element, "DeclickIn",
+var inputDeclickIn = new NumberInput(divMiscControls.element, "DeclickIn",
   0, 0, tenMilliSecond, 1, refresh)
+var inputDeclickOut = new NumberInput(divMiscControls.element, "DeclickOut",
+  20, 0, tenMilliSecond, 1, refresh)
+var checkboxNormalize = new Checkbox(divMiscControls.element, "Normalize",
+  true, refresh)
 
 refresh()

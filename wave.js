@@ -4,8 +4,6 @@ class Wave {
     for (var i = 0; i < channels; ++i) {
       this.data.push([])
     }
-
-    this.peakValue = null
   }
 
   get frames() {
@@ -78,17 +76,15 @@ class Wave {
 
   // 引数を指定しない場合は this.data のピーク値を1.0として正規化。
   normalize(divisor) {
-    if (isNaN(divisor)) {
+    var peakValue = divisor
+    if (!Number.isFinite(divisor)) {
       var peak = this.findPeak()
       if (peak === null) {
+        console.log("findPeak failed.")
         return
       }
       this.peakValue = peak.value
     }
-    else {
-      this.peakValue = divisor
-    }
-
 
     for (var i = 0; i < this.data.length; ++i) {
       for (var j = 0; j < this.data[i].length; ++j) {
@@ -97,15 +93,31 @@ class Wave {
     }
   }
 
-  declick(fadeLength) {
+  declick(fadein, fadeout) {
+    this.declickIn(fadein)
+    this.declickOut(fadeout)
+  }
+
+  declickIn(fadeLength) {
     for (var channel = 0; channel < this.data.length; ++channel) {
       var length = Math.min(fadeLength, this.data[channel].length)
       var coefficient = Math.pow(256, 1 / length)
       var gain = coefficient / 256
-      for (var sample = 0, back = this.data[channel].length - 1;
-        sample < length; ++sample, --back) {
+      for (var sample = 0; sample < length; ++sample) {
         this.data[channel][sample] *= gain
-        // this.data[channel][back] *= gain
+        gain *= coefficient
+      }
+    }
+  }
+
+  declickOut(fadeLength) {
+    for (var channel = 0; channel < this.data.length; ++channel) {
+      var length = Math.min(fadeLength, this.data[channel].length)
+      var coefficient = Math.pow(256, 1 / length)
+      var gain = coefficient / 256
+      var last = this.data[channel].length - 1
+      for (var sample = 0; sample < length; ++sample) {
+        this.data[channel][last - sample] *= gain
         gain *= coefficient
       }
     }
