@@ -168,7 +168,6 @@ class Oscillator {
     this._length = 960
     this.frequency = 440
     this.fmIndex = 1
-    this.feedback = 0
 
     this.phase = 0
 
@@ -192,18 +191,23 @@ class Oscillator {
     this.frequency = 440 * Math.pow(2, value / 1200)
   }
 
+  refresh(phase) {
+    this.phase = phase
+    this.bufferOutput = 0
+  }
+
   // time は経過サンプル数。
   oscillate(time, modulation) {
     if (time > this._length || time < 0) {
       return 0
     }
-
     var envTime = time / this._length
     var gain = this.gain * this.gainEnvelope.decay(envTime)
     var output = gain * Math.sin(this.phase)
-    var mod = this.fmIndex * modulation + this.feedback * output
-    this.phase += this.twoPiRate * this.frequency + mod
+    var mod = this.fmIndex * modulation
 
+    this.phase += this.twoPiRate * this.frequency + mod
+    this.bufferOutput = output
     return output
   }
 
@@ -242,14 +246,17 @@ class OperatorControl {
     this.oscillator.length = this.length.value
     this.oscillator.pitch = this.pitch.value * 100 + this.detune.value
     this.oscillator.gainEnvelope.tension = this.gainTension.value
-    this.oscillator.phase = this.phase.value * TWO_PI
+    this.oscillator.refresh(this.phase.value * TWO_PI)
   }
 
-  random() {
-    this.length.random()
+  random(isBottom) {
+    if (!isBottom) {
+      this.length.random()
+      this.gain.random()
+    }
     this.pitch.random()
-    this.detune.random()
     this.gainTension.random()
+    this.detune.random()
     this.phase.random()
   }
 }
@@ -293,7 +300,10 @@ class FMTower {
   }
 
   random() {
-    this.operatorControls.forEach(element => element.random())
+    for (var i = 0; i < this.operatorControls.length - 1; ++i) {
+      this.operatorControls[i].random(false)
+    }
+    this.operatorControls[i].random(true)
   }
 
   oscillate(time) {
@@ -346,14 +356,21 @@ var buttonRandom = new Button(divRenderControls.element, "Random",
 var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
   quickSave, (checked) => { quickSave = checked })
 
-var fmTower = new FMTower(divMain.element, audioContext, 3, refresh)
+var fmTower = new FMTower(divMain.element, audioContext, 4, refresh)
+
+var divFilterControls = new Div(divMain.element, "filterControls")
+var headingFilterControls = new Heading(divFilterControls.element, 6, "Filter")
+var inputCutoff = new NumberInput(divFilterControls.element, "Cutoff",
+  0, 0, 1, 0.01, refresh)
+var inputQ = new NumberInput(divFilterControls.element, "Q",
+  0, 0, 0, 0, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
   "Misc.")
 var tenMilliSecond = audioContext.sampleRate / 100
 var inputFMIndex = new NumberInput(divMiscControls.element, "FM Index",
-  1, 0, 2, 0.01, refresh)
+  0.62, 0, 1, 0.01, refresh)
 var inputDeclick = new NumberInput(divMiscControls.element, "DeclickIn",
   0, 0, tenMilliSecond, 1, refresh)
 
