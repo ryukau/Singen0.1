@@ -453,7 +453,7 @@ var inputFMIndex = new NumberInput(divMiscControls.element, "FM Index",
 var inputDeclickIn = new NumberInput(divMiscControls.element, "DeclickIn",
   0, 0, tenMilliSecond, 1, refresh)
 var inputDeclickOut = new NumberInput(divMiscControls.element, "DeclickOut",
-  20, 0, tenMilliSecond, 1, refresh)
+  0, 0, tenMilliSecond, 1, refresh)
 var checkboxNormalize = new Checkbox(divMiscControls.element, "Normalize",
   true, refresh)
 

@@ -220,6 +220,7 @@ class Checkbox {
     }
 
     this.label = document.createElement("label")
+    this.label.className = "checkbox"
     this.label.addEventListener("change", (event) => this.onChange(event), false)
     this.label.innerHTML = this.input.outerHTML + label
     parent.appendChild(this.label)
