@@ -163,11 +163,11 @@ class Oscillator {
   constructor(audioContext) {
     this.sampleRate = audioContext.sampleRate
 
+    this.gain = 1
     this.gainEnvelope = new Envelope(0.5)
     this._length = 960
     this.frequency = 440
     this.feedback = 0
-    this.fmIndex = 1
 
     this.phase = 0
 
@@ -198,9 +198,9 @@ class Oscillator {
     }
 
     var envTime = time / this._length
-    var output = this.gainEnvelope.decay(envTime) * Math.sin(this.phase)
-
-    var mod = this.fmIndex * modulation + this.feedback * output
+    var gain = this.gain * this.gainEnvelope.decay(envTime)
+    var output = gain * Math.sin(this.phase)
+    var mod = modulation + this.feedback * output
     this.phase += this.twoPiRate * this.frequency + mod
 
     return output
@@ -222,12 +222,14 @@ class OperatorControl {
       "Operator" + id)
     this.length = new NumberInput(this.div.element, "Length",
       0.2, 0.02, 1, 0.02, refresh)
+    this.gain = new NumberInput(this.div.element, "Gain",
+      1, 0, 1, 0.01, refresh)
+    this.gainTension = new NumberInput(this.div.element, "Tension",
+      0.5, 0, 1, 0.01, refresh)
     this.pitch = new NumberInput(this.div.element, "Pitch",
       0, -50, 50, 1, refresh)
     this.detune = new NumberInput(this.div.element, "Detune",
       0, -50, 50, 1, refresh)
-    this.gainTension = new NumberInput(this.div.element, "Tension",
-      0.5, 0, 1, 0.01, refresh)
     this.phase = new NumberInput(this.div.element, "Phase",
       0, 0, 1, 0.01, refresh)
 
@@ -235,6 +237,7 @@ class OperatorControl {
   }
 
   refresh() {
+    this.oscillator.gain = this.gain.value
     this.oscillator.length = this.length.value
     this.oscillator.pitch = this.pitch.value * 100 + this.detune.value
     this.oscillator.gainEnvelope.tension = this.gainTension.value
@@ -312,7 +315,6 @@ function refresh() {
 var audioContext = new AudioContext()
 
 var quickSave = false
-var oscBody = new Oscillator(audioContext)
 var filter = new StateVariableFilter(audioContext)
 var wave = new Wave(1)
 
