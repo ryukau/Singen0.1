@@ -170,7 +170,6 @@ class Oscillator {
     this.fmIndex = 0
 
     this.phase = 0
-    this.phaseReset = true
 
     this.twoPiRate = TWO_PI / this.sampleRate
   }
@@ -190,10 +189,6 @@ class Oscillator {
 
   set pitch(value) {
     this.frequency = 440 * Math.pow(2, value / 1200)
-  }
-
-  reset() {
-    this.phase = (this.phaseReset) ? 0 : Math.abs(this.phase) % TWO_PI
   }
 
   // time は経過サンプル数。
@@ -224,6 +219,7 @@ function random(randomBody) {
 }
 
 function refresh() {
+  oscBody.phase = inputPhase.value
   oscBody.length = inputLength.value
   oscBody.pitch = inputPitch.value * 100 + inputDetune.value
   oscBody.gainEnvelope.tension = inputGainTension.value
@@ -269,6 +265,8 @@ var inputDetune = new NumberInput(divOperatorControls.element, "Detune",
   0, -50, 50, 1, refresh)
 var inputGainTension = new NumberInput(divOperatorControls.element, "Tension",
   0.5, 0, 1, 0.01, refresh)
+var inputPhase = new NumberInput(divOperatorControls.element, "Phase",
+  0, 0, Math.PI, 0.01, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
