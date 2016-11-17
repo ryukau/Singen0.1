@@ -94,7 +94,6 @@ class TwoPoleLP {
   }
 
   clear() {
-    this.x.fill(0)
     this.y.fill(0)
   }
 
@@ -112,22 +111,50 @@ class TwoPoleLP {
 
 class StateVariableFilter {
   // http://www.earlevel.com/main/2003/03/02/the-digital-state-variable-filter/
-  constructor() {
+  constructor(audioContext) {
+    this.sampleRate = audioContext.sampleRate
     this.buffer = new Array(2).fill(0)
+
+    this._cutoff
+    this.fc
+    this.cutoff = audioContext.sampleRate / 2
+
+    this._q
+    this.q = 0.5
   }
 
-  pass(input, cutoff, sampleRate) {
-    var f = 2 * Math.sin(Math.PI * cutoff / sampleRate)
-    var q = 1 / 0.5 // 分母は 0.5 から infinity の範囲。
+  get cutoff() {
+    return this._cutoff
+  }
 
-    var A = input - this.buffer[0] * q - this.buffer[1]
-    var B = A * f + this.buffer[0]
-    var C = B * f + this.buffer[1]
+  // cutoff の範囲は [0, 1]
+  set cutoff(value) {
+    this._cutoff = value
+    this.fc = 2 * Math.sin(Math.PI * this._cutoff / this.sampleRate)
+  }
+
+  get q() {
+    return 1 / this._q
+  }
+
+  // q の範囲は [0.5, infinity]
+  set q(value) {
+    this._q = 1 / value
+  }
+
+  pass(input) {
+    var A = input - this.buffer[0] * this._q - this.buffer[1]
+    var B = A * this.fc + this.buffer[0]
+    var C = B * this.fc + this.buffer[1]
 
     this.buffer[0] = B
     this.buffer[1] = C
 
     return { lowpass: C, highpass: A, bandpass: B, bandreject: A + C }
+  }
+
+  refresh() {
+    this.buffer.fill(0)
   }
 }
 
@@ -211,9 +238,8 @@ var audioContext = new AudioContext()
 
 var quickSave = false
 var oscBody = new Oscillator(audioContext)
+var filter = new StateVariableFilter(audioContext)
 var wave = new Wave(1)
-wave.left = makeWave(0.02, audioContext.sampleRate, 200, 30)
-
 
 var divMain = new Div(document.body, "main")
 var headingTitle = new Heading(divMain.element, 1, "Singen0.1")
