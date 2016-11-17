@@ -127,7 +127,7 @@ class StateVariableFilter {
     this.buffer[0] = B
     this.buffer[1] = C
 
-    return { lowpass: C, highpass: A, bandpadd: B, bandreject: A + C }
+    return { lowpass: C, highpass: A, bandpass: B, bandreject: A + C }
   }
 }
 
