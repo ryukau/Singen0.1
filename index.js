@@ -34,7 +34,7 @@ function save(wave) {
   var a = document.createElement("a")
   a.style = "display: none"
   a.href = url
-  a.download = "SingenBD2_" + Date.now() + ".wav"
+  a.download = "Singen0.1_" + Date.now() + ".wav"
   document.body.appendChild(a)
   a.click()
 
