@@ -56,6 +56,81 @@ function makeWave(length, sampleRate) {
   return wave
 }
 
+class TwoPoleLP {
+  //
+  // Two Poleとして紹介されていた差分方程式の
+  // 定数 a1 と a2 に適当な値を入れたフィルタ。
+  // y[n] = b0 * x[n] - a1 * y[n-1] - a2 * y[n-2]
+  //
+  // cutoff の値は [1, 10^8]
+  // resonance の値は [0, 0.5]
+  //
+  constructor(sampleRate) {
+    this.sampleRate = sampleRate
+    this.y = new Array(3).fill(0)
+    this._cutoff = 1e8
+    this._resonance = 0
+
+    this.a1 = null
+    this.a2 = null
+    this.refresh()
+  }
+
+  cutoff(value) {
+    var clamped = Math.max(1, Math.min(value, 1e8))
+    this._cutoff = Math.pow(10, clamped * 8)
+    this.refresh()
+  }
+
+  resonance(value) {
+    var clamped = 1 - Math.max(0, Math.min(value, 1))
+    this._resonance = 0.5 * (1 - clamped * clamped * clamped)
+    this.refresh()
+  }
+
+  refresh() {
+    this.a1 = 100 * this.sampleRate * this._cutoff
+    this.a2 = -this._resonance * this.a1
+  }
+
+  clear() {
+    this.x.fill(0)
+    this.y.fill(0)
+  }
+
+  pass(input) {
+    var numer = (input + this.a1 * this.y[1] + this.a2 * this.y[2])
+    var denom = 1 + this.a1 + this.a2
+    var output = numer / denom
+
+    this.y.unshift(output)
+    this.y.pop()
+
+    return output
+  }
+}
+
+class StateVariableFilter {
+  // http://www.earlevel.com/main/2003/03/02/the-digital-state-variable-filter/
+  constructor() {
+    this.buffer = new Array(2).fill(0)
+  }
+
+  pass(input, cutoff, sampleRate) {
+    var f = 2 * Math.sin(Math.PI * cutoff / sampleRate)
+    var q = 1 / 0.5 // 分母は 0.5 から infinity の範囲。
+
+    var A = input - this.buffer[0] * q - this.buffer[1]
+    var B = A * f + this.buffer[0]
+    var C = B * f + this.buffer[1]
+
+    this.buffer[0] = B
+    this.buffer[1] = C
+
+    return { lowpass: C, highpass: A, bandpadd: B, bandreject: A + C }
+  }
+}
+
 class Oscillator {
   // グローバルでTWO_PI = 2 * Math.PIが定義されていること。
   constructor(audioContext) {
