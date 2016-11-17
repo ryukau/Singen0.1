@@ -51,7 +51,7 @@ function makeWave(length, sampleRate) {
   var waveLength = Math.floor(sampleRate * length)
   var wave = new Array(waveLength).fill(0)
   for (var t = 0; t < wave.length; ++t) {
-    wave[t] += 0.8 * operatorControl.oscillator.oscillate(t, 0)
+    wave[t] += fmTower.oscillate(t)
   }
   return wave
 }
@@ -167,7 +167,7 @@ class Oscillator {
     this._length = 960
     this.frequency = 440
     this.feedback = 0
-    this.fmIndex = 0
+    this.fmIndex = 1
 
     this.phase = 0
 
@@ -216,7 +216,7 @@ class Oscillator {
 }
 
 class OperatorControl {
-  constructor(parent, refreshFunc, id, audioContext) {
+  constructor(parent, audioContext, id, refreshFunc) {
     this.div = new Div(divMain.element, "operatorControl")
     this.headingOperatorControls = new Heading(this.div.element, 6,
       "Operator" + id)
@@ -251,15 +251,28 @@ class OperatorControl {
 }
 
 class FMTower {
-  constructor(parent, refreshFunc, numOperator) {
+  constructor(parent, audioContext, numOperator, refreshFunc) {
+    this.audioContext = audioContext
     this.refreshFunc = refreshFunc
     this.div = new Div(parent, "fmTower")
     this.operatorControls = []
+    for (var i = 0; i < numOperator; ++i) {
+      this.push()
+    }
+  }
+
+  get length() {
+    if (this.operatorControls.length > 0) {
+      var last = this.operatorControls.length - 1
+      return this.operatorControls[last].length.value
+    }
+    return 0
   }
 
   push() {
     this.operatorControls.push(new OperatorControl(
-      this.div.element, this.refreshFunc, this.operatorControls.length))
+      this.div.element, this.audioContext, this.operatorControls.length,
+      this.refreshFunc))
   }
 
   pop() {
@@ -267,8 +280,20 @@ class FMTower {
     this.div.element.removeChild(child)
   }
 
+  refresh() {
+    this.operatorControls.forEach(element => element.refresh())
+  }
+
   random() {
     this.operatorControls.forEach(element => element.random())
+  }
+
+  oscillate(time) {
+    var value = 0
+    for (var i = 0; i < this.operatorControls.length; ++i) {
+      value = this.operatorControls[i].oscillator.oscillate(time, value)
+    }
+    return value
   }
 }
 
@@ -276,9 +301,9 @@ function random() {
 }
 
 function refresh() {
-  operatorControl.refresh()
+  fmTower.refresh()
 
-  wave.left = makeWave(operatorControl.length.value, audioContext.sampleRate)
+  wave.left = makeWave(fmTower.length, audioContext.sampleRate)
   wave.declick(inputDeclick.value)
 
   waveView.set(wave.left)
@@ -308,7 +333,7 @@ var buttonSave = new Button(divRenderControls.element, "Save",
 var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
   quickSave, (checked) => { quickSave = checked })
 
-var operatorControl = new OperatorControl(divMain.element, refresh, 1, audioContext)
+var fmTower = new FMTower(divMain.element, audioContext, 3, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
