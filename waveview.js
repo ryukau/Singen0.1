@@ -56,7 +56,7 @@ class WaveView extends Canvas {
   }
 
   onWheel(event) {
-    // console.log(event)
+    event.preventDefault() // 画面のスクロールを阻止。
     if (event.ctrlKey || event.altKey) {
       this.scroll(event)
     }
