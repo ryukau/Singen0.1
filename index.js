@@ -226,6 +226,7 @@ class Oscillator {
 class OperatorControl {
   constructor(parent, audioContext, id, refreshFunc) {
     this.div = new Div(divMain.element, "operatorControl")
+    this.div.element.className = "synthControls"
     this.headingOperatorControls = new Heading(this.div.element, 6,
       "Operator" + id)
     this.length = new NumberInput(this.div.element, "Length",
@@ -271,6 +272,7 @@ class FilterControls {
     this.MAX_ORDER = 8
 
     this.div = new Div(parent, "filterControls")
+    this.div.element.className = "synthControls"
     this.headingFilterControls = new Heading(this.div.element, 6, "Filter")
     this.type = new RadioButton(this.div.element, "Type",
       (value) => this.setPassFunc(value))
@@ -439,6 +441,7 @@ var fmTower = new FMTower(divMain.element, audioContext, 4, refresh)
 var filter = new FilterControls(divMain.element, audioContext, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
+divMiscControls.element.className = "synthControls"
 var headingMiscControls = new Heading(divMiscControls.element, 6,
   "Misc.")
 var tenMilliSecond = audioContext.sampleRate / 100
