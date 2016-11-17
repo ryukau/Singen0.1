@@ -301,6 +301,9 @@ class FMTower {
 }
 
 function random() {
+  fmTower.random()
+  refresh()
+  play(audioContext, wave)
 }
 
 function refresh() {
@@ -332,6 +335,8 @@ var buttonPlay = new Button(divRenderControls.element, "Play",
   () => play(audioContext, wave))
 var buttonSave = new Button(divRenderControls.element, "Save",
   () => save(wave))
+var buttonRandom = new Button(divRenderControls.element, "Random",
+  () => random())
 var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
   quickSave, (checked) => { quickSave = checked })
 
