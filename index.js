@@ -167,6 +167,7 @@ class Oscillator {
     this.gainEnvelope = new Envelope(0.5)
     this._length = 960
     this.frequency = 440
+    this.fmIndex = 1
     this.feedback = 0
 
     this.phase = 0
@@ -200,7 +201,7 @@ class Oscillator {
     var envTime = time / this._length
     var gain = this.gain * this.gainEnvelope.decay(envTime)
     var output = gain * Math.sin(this.phase)
-    var mod = modulation + this.feedback * output
+    var mod = this.fmIndex * modulation + this.feedback * output
     this.phase += this.twoPiRate * this.frequency + mod
 
     return output
@@ -272,6 +273,10 @@ class FMTower {
     return 0
   }
 
+  set fmIndex(value) {
+    this.operatorControls.forEach(element => element.oscillator.fmIndex = value)
+  }
+
   push() {
     this.operatorControls.push(new OperatorControl(
       this.div.element, this.audioContext, this.operatorControls.length,
@@ -308,6 +313,7 @@ function random() {
 
 function refresh() {
   fmTower.refresh()
+  fmTower.fmIndex = inputFMIndex.value
 
   wave.left = makeWave(fmTower.length, audioContext.sampleRate)
   wave.declick(inputDeclick.value)
@@ -346,6 +352,8 @@ var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
   "Misc.")
 var tenMilliSecond = audioContext.sampleRate / 100
+var inputFMIndex = new NumberInput(divMiscControls.element, "FM Index",
+  1, 0, 2, 0.01, refresh)
 var inputDeclick = new NumberInput(divMiscControls.element, "DeclickIn",
   0, 0, tenMilliSecond, 1, refresh)
 
