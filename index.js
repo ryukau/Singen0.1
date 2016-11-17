@@ -51,7 +51,7 @@ function makeWave(length, sampleRate) {
   var waveLength = Math.floor(sampleRate * length)
   var wave = new Array(waveLength).fill(0)
   for (var t = 0; t < wave.length; ++t) {
-    wave[t] += 0.8 * oscBody.oscillate(t, 0)
+    wave[t] += 0.8 * operatorControl.oscillator.oscillate(t, 0)
   }
   return wave
 }
@@ -215,16 +215,70 @@ class Oscillator {
   }
 }
 
-function random(randomBody) {
+class OperatorControl {
+  constructor(parent, refreshFunc, id, audioContext) {
+    this.div = new Div(divMain.element, "operatorControl")
+    this.headingOperatorControls = new Heading(this.div.element, 6,
+      "Operator" + id)
+    this.length = new NumberInput(this.div.element, "Length",
+      0.2, 0.02, 1, 0.02, refresh)
+    this.pitch = new NumberInput(this.div.element, "Pitch",
+      0, -50, 50, 1, refresh)
+    this.detune = new NumberInput(this.div.element, "Detune",
+      0, -50, 50, 1, refresh)
+    this.gainTension = new NumberInput(this.div.element, "Tension",
+      0.5, 0, 1, 0.01, refresh)
+    this.phase = new NumberInput(this.div.element, "Phase",
+      0, 0, 1, 0.01, refresh)
+
+    this.oscillator = new Oscillator(audioContext)
+  }
+
+  refresh() {
+    this.oscillator.length = this.length.value
+    this.oscillator.pitch = this.pitch.value * 100 + this.detune.value
+    this.oscillator.gainEnvelope.tension = this.gainTension.value
+    this.oscillator.phase = this.phase.value * TWO_PI
+  }
+
+  random() {
+    this.length.random()
+    this.pitch.random()
+    this.detune.random()
+    this.gainTension.random()
+    this.phase.random()
+  }
+}
+
+class FMTower {
+  constructor(parent, refreshFunc, numOperator) {
+    this.refreshFunc = refreshFunc
+    this.div = new Div(parent, "fmTower")
+    this.operatorControls = []
+  }
+
+  push() {
+    this.operatorControls.push(new OperatorControl(
+      this.div.element, this.refreshFunc, this.operatorControls.length))
+  }
+
+  pop() {
+    var child = this.operatorControls.pop().div.element
+    this.div.element.removeChild(child)
+  }
+
+  random() {
+    this.operatorControls.forEach(element => element.random())
+  }
+}
+
+function random() {
 }
 
 function refresh() {
-  oscBody.phase = inputPhase.value
-  oscBody.length = inputLength.value
-  oscBody.pitch = inputPitch.value * 100 + inputDetune.value
-  oscBody.gainEnvelope.tension = inputGainTension.value
+  operatorControl.refresh()
 
-  wave.left = makeWave(inputLength.value, audioContext.sampleRate)
+  wave.left = makeWave(operatorControl.length.value, audioContext.sampleRate)
   wave.declick(inputDeclick.value)
 
   waveView.set(wave.left)
@@ -254,19 +308,7 @@ var buttonSave = new Button(divRenderControls.element, "Save",
 var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
   quickSave, (checked) => { quickSave = checked })
 
-var divOperatorControls = new Div(divMain.element, "operatorControls")
-var headingOperatorControls = new Heading(divOperatorControls.element, 6,
-  "Operator")
-var inputLength = new NumberInput(divOperatorControls.element, "Length",
-  0.2, 0.02, 1, 0.02, refresh)
-var inputPitch = new NumberInput(divOperatorControls.element, "Pitch",
-  0, -50, 50, 1, refresh)
-var inputDetune = new NumberInput(divOperatorControls.element, "Detune",
-  0, -50, 50, 1, refresh)
-var inputGainTension = new NumberInput(divOperatorControls.element, "Tension",
-  0.5, 0, 1, 0.01, refresh)
-var inputPhase = new NumberInput(divOperatorControls.element, "Phase",
-  0, 0, Math.PI, 0.01, refresh)
+var operatorControl = new OperatorControl(divMain.element, refresh, 1, audioContext)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 var headingMiscControls = new Heading(divMiscControls.element, 6,
