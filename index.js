@@ -161,6 +161,37 @@ class StateVariableFilter {
   }
 }
 
+class Delay {
+  constructor(audioContext) {
+    this.sampleRate = audioContext.sampleRate
+    this.buffer = []
+    this.index = 0
+    this._feedback = 0.5
+  }
+
+  // value はミリ秒。
+  set length(value) {
+    var length = Math.floor(value * this.sampleRate / 1000)
+    this.buffer = new Array(length).fill(0)
+  }
+
+  set feedback(value) {
+    this._feedback = Math.max(-0.99, Math.min(value, 0.99))
+  }
+
+  refresh() {
+    this.buffer.fill(0)
+    this.index = 0
+  }
+
+  pass(input) {
+    var output = input + this.buffer[this.index] * this._feedback
+    this.buffer[this.index] = output
+    this.index = (this.index + 1) % this.buffer.length
+    return output
+  }
+}
+
 class Oscillator {
   // グローバルでTWO_PI = 2 * Math.PIが定義されていること。
   constructor(audioContext) {
@@ -269,13 +300,14 @@ class FilterControls {
   constructor(parent, audioContext, refreshFunc) {
     this.refreshFunc = refreshFunc
     this.passFunc = (filter, value) => value
+    this.saturationFunc = (value, drive) => value
     this.MAX_ORDER = 8
 
     this.div = new Div(parent, "filterControls")
     this.div.element.className = "synthControls"
     this.headingFilterControls = new Heading(this.div.element, 6, "Filter")
     this.type = new RadioButton(this.div.element, "Type",
-      (value) => this.setPassFunc(value))
+      value => this.setPassFunc(value))
     this.type.add("Bypass")
     this.type.add("LP")
     this.type.add("HP")
@@ -287,11 +319,26 @@ class FilterControls {
       0.5, 0.1, 1, 0.01, refreshFunc)
     this.q = new NumberInput(this.div.element, "Q",
       0, 0, 0.9, 0.01, refreshFunc)
+    this.delayTime = new NumberInput(this.div.element, "DelayTime",
+      12, 0.01, 40, 0.01, refreshFunc)
+    this.feedback = new NumberInput(this.div.element, "Feedback",
+      0.5, 0.01, 0.99, 0.01, refreshFunc)
+    this.saturation = new RadioButton(this.div.element, "Saturation",
+      value => this.setSaturationFunc(value))
+    this.saturation.add("Bypass")
+    this.saturation.add("tanh")
+    this.saturation.add("G-b")
+    this.saturation.add("Watte")
+    this.saturation.add("T&J")
+    this.drive = new NumberInput(this.div.element, "Drive",
+      0.5, 0.01, 1, 0.01, refreshFunc)
 
     this.filter = []
     for (var i = 0; i < this.MAX_ORDER; ++i) {
       this.filter.push(new StateVariableFilter(audioContext))
     }
+
+    this.delay = new Delay(audioContext)
   }
 
   setPassFunc(type) {
@@ -316,12 +363,59 @@ class FilterControls {
     this.refreshFunc()
   }
 
+  setSaturationFunc(type) {
+    // http://www.musicdsp.org/archive.php?classid=4
+    switch (type) {
+      case "T&J": // TarrabiaAndJong
+        this.saturationFunc = (value, drive) => {
+          drive = 1.98 * drive - 0.99
+          var k = 2 * drive / (1 - drive)
+          var out = (1 + k) * value / (1 + k * Math.abs(value))
+          return Number.isFinite(out) ? out : 0
+        }
+        break
+      case "Watte":
+        this.saturationFunc = (value, drive) => {
+          var a = 10 * drive // overdrive amount
+          var z = Math.PI * a
+          var s = 1 / Math.sin(z)
+          var b = 1 / a
+          return (value > b) ? 1 : Math.sin(z * value) * s
+        }
+        break
+      case "G-b": // Gloubi-boulga
+        this.saturationFunc = (value, drive) => {
+          var x = value * 2 * drive * 0.686306
+          var a = 1 + Math.exp(Math.sqrt(Math.abs(x)) * -0.75)
+          var expX = Math.exp(x)
+          var out = (expX - Math.exp(-x * a)) / (expX + Math.exp(-x))
+          return Number.isFinite(out) ? out : 0
+        }
+        break
+      case "tanh":
+        this.saturationFunc = (value, drive) => Math.tanh(value * 2 * drive)
+        break
+      case "Bypass":
+      default:
+        this.saturationFunc = (value, drive) => value
+        break
+    }
+    this.refreshFunc()
+  }
+
+  fastatan(x) {
+    return x / (1.0 + 0.28 * (x * x))
+  }
+
   refresh() {
     for (var i = 0; i < this.order.value; ++i) {
       this.filter[i].cutoff = this.cutoff.value
       this.filter[i].q = this.q.value
       this.filter[i].refresh()
     }
+    this.delay.length = this.delayTime.value
+    this.delay.feedback = this.feedback.value
+    this.delay.refresh()
   }
 
   random() {
@@ -333,7 +427,8 @@ class FilterControls {
     for (var i = 0; i < this.order.value; ++i) {
       value = this.passFunc(this.filter[i], value)
     }
-    return value
+    value = this.delay.pass(value)
+    return this.saturationFunc(value, this.drive.value)
   }
 }
 
