@@ -51,7 +51,10 @@ function makeWave(length, sampleRate) {
   var waveLength = Math.floor(sampleRate * length)
   var wave = new Array(waveLength).fill(0)
   for (var t = 0; t < wave.length; ++t) {
-    wave[t] += filter.pass(fmTower.oscillate(t))
+    var fm = fmTower.oscillate(t)
+    var filt = filter.pass(fm)
+    var del = delay.pass(filt)
+    wave[t] += saturation.pass(del)
   }
   return wave
 }
@@ -172,6 +175,7 @@ class Delay {
   // value はミリ秒。
   set length(value) {
     var length = Math.floor(value * this.sampleRate / 1000)
+    length = (length < 1) ? 1 : length
     this.buffer = new Array(length).fill(0)
   }
 
@@ -300,13 +304,12 @@ class FilterControls {
   constructor(parent, audioContext, refreshFunc) {
     this.refreshFunc = refreshFunc
     this.passFunc = (filter, value) => value
-    this.saturationFunc = (value, drive) => value
     this.MAX_ORDER = 8
 
     this.div = new Div(parent, "filterControls")
     this.div.element.className = "synthControls"
     this.headingFilterControls = new Heading(this.div.element, 6, "Filter")
-    this.type = new RadioButton(this.div.element, "Type",
+    this.type = new RadioButton(this.div.element, "FilterType",
       value => this.setPassFunc(value))
     this.type.add("Bypass")
     this.type.add("LP")
@@ -319,26 +322,11 @@ class FilterControls {
       0.5, 0.1, 1, 0.01, refreshFunc)
     this.q = new NumberInput(this.div.element, "Q",
       0, 0, 0.9, 0.01, refreshFunc)
-    this.delayTime = new NumberInput(this.div.element, "DelayTime",
-      12, 0.01, 40, 0.01, refreshFunc)
-    this.feedback = new NumberInput(this.div.element, "Feedback",
-      0.5, 0.01, 0.99, 0.01, refreshFunc)
-    this.saturation = new RadioButton(this.div.element, "Saturation",
-      value => this.setSaturationFunc(value))
-    this.saturation.add("Bypass")
-    this.saturation.add("tanh")
-    this.saturation.add("G-b")
-    this.saturation.add("Watte")
-    this.saturation.add("T&J")
-    this.drive = new NumberInput(this.div.element, "Drive",
-      0.5, 0.01, 1, 0.01, refreshFunc)
 
     this.filter = []
     for (var i = 0; i < this.MAX_ORDER; ++i) {
       this.filter.push(new StateVariableFilter(audioContext))
     }
-
-    this.delay = new Delay(audioContext)
   }
 
   setPassFunc(type) {
@@ -361,6 +349,120 @@ class FilterControls {
         break
     }
     this.refreshFunc()
+  }
+
+  refresh() {
+    for (var i = 0; i < this.order.value; ++i) {
+      this.filter[i].cutoff = this.cutoff.value
+      this.filter[i].q = this.q.value
+      this.filter[i].refresh()
+    }
+  }
+
+  random() {
+    this.cutoff.random()
+    this.q.random()
+  }
+
+  pass(value) {
+    for (var i = 0; i < this.order.value; ++i) {
+      value = this.passFunc(this.filter[i], value)
+    }
+    return value
+  }
+}
+
+class DelayControls {
+  constructor(parent, audioContext, refreshFunc) {
+    this.refreshFunc = refreshFunc
+    this.delayFunc = value => value
+    this.NUM_DELAY = 2
+
+    this.div = new Div(parent, "delayControls")
+    this.div.element.className = "synthControls"
+    this.headingFilterControls = new Heading(this.div.element, 6, "Delay")
+    this.type = new RadioButton(this.div.element, "DelayType",
+      value => this.setPassFunc(value))
+    this.type.add("Bypass")
+    this.type.add("Serial")
+    this.type.add("Parallel")
+    this.delayTime = []
+    this.feedback = []
+    this.delay = []
+
+    for (var i = 0; i < this.NUM_DELAY; ++i) {
+      this.delayTime.push(new NumberInput(this.div.element, "DelayTime" + i,
+        12, 0.01, 40, 0.01, refreshFunc))
+      this.feedback.push(new NumberInput(this.div.element, "Feedback" + i,
+        0.5, 0, 0.99, 0.01, refreshFunc))
+      this.delay.push(new Delay(audioContext))
+    }
+  }
+
+  setPassFunc(type) {
+    switch (type) {
+      case "Serial":
+        this.delayFunc = value => {
+          for (var i = 0; i < this.NUM_DELAY; ++i) {
+            value = this.delay[i].pass(value)
+          }
+          return value
+        }
+        break
+      case "Parallel":
+        this.delayFunc = value => {
+          var sum = 0
+          for (var i = 0; i < this.NUM_DELAY; ++i) {
+            sum += this.delay[i].pass(value)
+          }
+          return sum
+        }
+        break
+      case "Bypass":
+      default:
+        this.delayFunc = value => value
+        break
+    }
+    this.refreshFunc()
+  }
+
+  refresh() {
+    for (var i = 0; i < this.NUM_DELAY; ++i) {
+      this.delay[i].length = this.delayTime[i].value
+      this.delay[i].feedback = this.feedback[i].value
+      this.delay[i].refresh()
+    }
+  }
+
+  random(lockDelayTime) {
+    for (var i = 0; i < this.NUM_DELAY; ++i) {
+      this.delayTime[i].random()
+      this.feedback[i].random()
+    }
+  }
+
+  pass(value) {
+    return this.delayFunc(value)
+  }
+}
+
+class SaturationControls {
+  constructor(parent, audioContext, refreshFunc) {
+    this.refreshFunc = refreshFunc
+    this.saturationFunc = (value, drive) => value
+
+    this.div = new Div(parent, "saturationControls")
+    this.div.element.className = "synthControls"
+    this.headingFilterControls = new Heading(this.div.element, 6, "Saturation")
+    this.type = new RadioButton(this.div.element, "SaturationType",
+      value => this.setSaturationFunc(value))
+    this.type.add("Bypass")
+    this.type.add("tanh")
+    this.type.add("G-b")
+    this.type.add("Watte")
+    this.type.add("T&J")
+    this.drive = new NumberInput(this.div.element, "Drive",
+      0.5, 0.01, 1, 0.01, refreshFunc)
   }
 
   setSaturationFunc(type) {
@@ -407,27 +509,7 @@ class FilterControls {
     return x / (1.0 + 0.28 * (x * x))
   }
 
-  refresh() {
-    for (var i = 0; i < this.order.value; ++i) {
-      this.filter[i].cutoff = this.cutoff.value
-      this.filter[i].q = this.q.value
-      this.filter[i].refresh()
-    }
-    this.delay.length = this.delayTime.value
-    this.delay.feedback = this.feedback.value
-    this.delay.refresh()
-  }
-
-  random() {
-    this.cutoff.random()
-    this.q.random()
-  }
-
   pass(value) {
-    for (var i = 0; i < this.order.value; ++i) {
-      value = this.passFunc(this.filter[i], value)
-    }
-    value = this.delay.pass(value)
     return this.saturationFunc(value, this.drive.value)
   }
 }
@@ -493,6 +575,7 @@ class FMTower {
 function random() {
   fmTower.random()
   filter.random()
+  delay.random()
   refresh()
   play(audioContext, wave)
 }
@@ -501,6 +584,7 @@ function refresh() {
   fmTower.refresh()
   fmTower.fmIndex = inputFMIndex.value
   filter.refresh()
+  delay.refresh()
 
   wave.left = makeWave(fmTower.length, audioContext.sampleRate)
   wave.declick(inputDeclickIn.value, inputDeclickOut.value)
@@ -537,6 +621,8 @@ var checkboxQuickSave = new Checkbox(divRenderControls.element, "QuickSave",
 
 var fmTower = new FMTower(divMain.element, audioContext, 4, refresh)
 var filter = new FilterControls(divMain.element, audioContext, refresh)
+var delay = new DelayControls(divMain.element, audioContext, refresh)
+var saturation = new SaturationControls(divMain.element, audioContext, refresh)
 
 var divMiscControls = new Div(divMain.element, "miscControls")
 divMiscControls.element.className = "synthControls"
